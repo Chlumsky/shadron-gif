@@ -29,7 +29,7 @@ Create an input GIF animation with:
 
 (The file name specification is optional just like in the `file` initializer.)
 
-To export an animation as a GIF file, you may declare an MP4 export like this:
+To export an animation as a GIF file, you may declare a GIF export like this:
 
     export gif(MyAnimation, "output.gif", <framerate>, <duration>, <repeat>);
 
