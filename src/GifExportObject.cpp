@@ -45,8 +45,13 @@ void GifExportObject::setSourcePixels(int sourceId, const void *pixels, int widt
             data->w = width, data->h = height;
         }
         if (data->indexedBitmap && width == data->w && height == data->h) {
-            data->paletteSize = 256;
-            quantize(data->indexedBitmap, data->palette, pixels, width, height, data->paletteSize, true);
+            int colorCount = 256;
+            quantize(data->indexedBitmap, data->palette, pixels, width, height, colorCount, true);
+            int ceiledCount = 256;
+            while ((ceiledCount>>1) >= colorCount && ceiledCount > 2)
+                ceiledCount >>= 1;
+            memset(data->palette+colorCount, 0, (ceiledCount-colorCount)*sizeof(*data->palette));
+            data->paletteSize = ceiledCount;
         }
     }
 }
