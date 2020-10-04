@@ -15,7 +15,7 @@ static LPWSTR utf8ToWStr(const char *str) {
     LPWSTR wstr = NULL;
     int utf8Len = (int) strlen(str);
     if (utf8Len > 0) {
-        int buffLen = 2*(utf8Len+1);
+        int buffLen = utf8Len+1;
         wstr = reinterpret_cast<LPWSTR>(malloc(sizeof(WCHAR)*buffLen));
         int wLen = MultiByteToWideChar(CP_UTF8, 0, str, utf8Len, wstr, buffLen);
         if (wLen < 0 || wLen >= buffLen) {

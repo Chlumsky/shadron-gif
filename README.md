@@ -38,6 +38,10 @@ as in `png_sequence` and other export types.
 The repeat parameter (true / false) is optional and sets whether the GIF file
 should repeat.
 
+To export a stationary image as a GIF file, the same declaration can be used with the last three parameters omitted:
+
+    export gif(MyImage, "output.gif");
+
 You may also apply the color quantization algorithm used for the GIF export
 on an image or animation like this:
 

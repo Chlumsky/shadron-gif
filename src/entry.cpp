@@ -16,6 +16,7 @@ struct ParseData {
     int curArg;
     std::string filename;
     int sourceId;
+    bool animated;
     int exprFramerate;
     int exprDuration;
     int exprRepeat;
@@ -120,7 +121,11 @@ int __declspec(dllexport) shadron_parse_initializer_argument(void *context, void
                 case 0: // Source animation name
                     if (argumentType != SHADRON_ARG_SOURCE_OBJ)
                         return SHADRON_RESULT_UNEXPECTED_ERROR;
-                    if (reinterpret_cast<const int *>(argumentData)[1] != SHADRON_FLAG_ANIMATION)
+                    if (reinterpret_cast<const int *>(argumentData)[1] == SHADRON_FLAG_IMAGE)
+                        pd->animated = false;
+                    else if (reinterpret_cast<const int *>(argumentData)[1] == SHADRON_FLAG_ANIMATION)
+                        pd->animated = true;
+                    else
                         return SHADRON_RESULT_PARSE_ERROR;
                     pd->sourceId = reinterpret_cast<const int *>(argumentData)[0];
                     *nextArgumentTypes = SHADRON_ARG_FILENAME;
@@ -129,13 +134,15 @@ int __declspec(dllexport) shadron_parse_initializer_argument(void *context, void
                     if (argumentType != SHADRON_ARG_FILENAME)
                         return SHADRON_RESULT_UNEXPECTED_ERROR;
                     pd->filename = reinterpret_cast<const char *>(argumentData);
-                    *nextArgumentTypes = SHADRON_ARG_FLOAT|(SHADRON_VERSION >= 141 ? SHADRON_ARG_EXPR_FLOAT : 0);
+                    pd->exprFramerate = -1;
+                    pd->exprDuration = -1;
+                    pd->exprRepeat = -1;
+                    *nextArgumentTypes = pd->animated ? (SHADRON_ARG_FLOAT|(SHADRON_VERSION >= 141 ? SHADRON_ARG_EXPR_FLOAT : 0)) : SHADRON_ARG_NONE;
                     break;
                 case 2: // Animation framerate
                     if (argumentType == SHADRON_ARG_EXPR_FLOAT)
                         pd->exprFramerate = *reinterpret_cast<const int *>(argumentData);
                     else if (argumentType == SHADRON_ARG_FLOAT) {
-                        pd->exprFramerate = -1;
                         pd->framerate = *reinterpret_cast<const float *>(argumentData);
                         if (pd->framerate <= 0.f)
                             return SHADRON_RESULT_PARSE_ERROR;
@@ -147,13 +154,11 @@ int __declspec(dllexport) shadron_parse_initializer_argument(void *context, void
                     if (argumentType == SHADRON_ARG_EXPR_FLOAT)
                         pd->exprDuration = *reinterpret_cast<const int *>(argumentData);
                     else if (argumentType == SHADRON_ARG_FLOAT) {
-                        pd->exprDuration = -1;
                         pd->duration = *reinterpret_cast<const float *>(argumentData);
                         if (pd->duration <= 0.f)
                             return SHADRON_RESULT_PARSE_ERROR;
                     } else
                         return SHADRON_RESULT_UNEXPECTED_ERROR;
-                    pd->exprRepeat = -1;
                     pd->repeat = true;
                     *nextArgumentTypes = SHADRON_ARG_NONE|SHADRON_ARG_BOOL|(SHADRON_VERSION >= 141 ? SHADRON_ARG_EXPR_BOOL : 0);
                     break;
@@ -208,7 +213,7 @@ int __declspec(dllexport) shadron_parse_initializer_finish(void *context, void *
                     obj = dynamic_cast<GifInputObject *>(obj)->reconfigure(pd->filename);
                     break;
                 case INITIALIZER_GIF_EXPORT_ID:
-                    obj = dynamic_cast<GifExportObject *>(obj)->reconfigure(pd->sourceId, pd->filename, pd->exprFramerate, pd->exprDuration, pd->exprRepeat, pd->framerate, pd->duration, pd->repeat);
+                    obj = dynamic_cast<GifExportObject *>(obj)->reconfigure(pd->sourceId, pd->animated, pd->filename, pd->exprFramerate, pd->exprDuration, pd->exprRepeat, pd->framerate, pd->duration, pd->repeat);
                     break;
                 case INITIALIZER_QUANTIZE_ID:
                     obj = dynamic_cast<QuantizeObject *>(obj)->reconfigure(pd->sourceId, pd->exprColorCount);
@@ -223,7 +228,7 @@ int __declspec(dllexport) shadron_parse_initializer_finish(void *context, void *
                     obj = new GifInputObject(name, pd->filename);
                     break;
                 case INITIALIZER_GIF_EXPORT_ID:
-                    obj = new GifExportObject(pd->sourceId, pd->filename, pd->exprFramerate, pd->exprDuration, pd->exprRepeat, pd->framerate, pd->duration, pd->repeat);
+                    obj = new GifExportObject(pd->sourceId, pd->animated, pd->filename, pd->exprFramerate, pd->exprDuration, pd->exprRepeat, pd->framerate, pd->duration, pd->repeat);
                     break;
                 case INITIALIZER_QUANTIZE_ID:
                     obj = new QuantizeObject(name, pd->sourceId, pd->exprColorCount);
@@ -248,11 +253,17 @@ int __declspec(dllexport) shadron_parse_error_length(void *context, void *parseC
                     *length = sizeof(ERROR_EXPORT_SOURCE_TYPE)-1;
                     return SHADRON_RESULT_OK;
                 case 2: // Video framerate
-                    *length = sizeof(ERROR_FRAMERATE_POSITIVE)-1;
-                    return SHADRON_RESULT_OK;
+                    if (pd->animated) {
+                        *length = sizeof(ERROR_FRAMERATE_POSITIVE)-1;
+                        return SHADRON_RESULT_OK;
+                    }
+                    break;
                 case 3: // Video duration
-                    *length = sizeof(ERROR_DURATION_NONNEGATIVE)-1;
-                    return SHADRON_RESULT_OK;
+                    if (pd->animated) {
+                        *length = sizeof(ERROR_DURATION_NONNEGATIVE)-1;
+                        return SHADRON_RESULT_OK;
+                    }
+                    break;
             }
             break;
         case INITIALIZER_QUANTIZE_ID:
@@ -279,12 +290,16 @@ int __declspec(dllexport) shadron_parse_error_string(void *context, void *parseC
                     errorStrLen = sizeof(ERROR_EXPORT_SOURCE_TYPE)-1;
                     break;
                 case 2: // Video framerate
-                    errorString = ERROR_FRAMERATE_POSITIVE;
-                    errorStrLen = sizeof(ERROR_FRAMERATE_POSITIVE)-1;
+                    if (pd->animated) {
+                        errorString = ERROR_FRAMERATE_POSITIVE;
+                        errorStrLen = sizeof(ERROR_FRAMERATE_POSITIVE)-1;
+                    }
                     break;
                 case 3: // Video duration
-                    errorString = ERROR_DURATION_NONNEGATIVE;
-                    errorStrLen = sizeof(ERROR_DURATION_NONNEGATIVE)-1;
+                    if (pd->animated) {
+                        errorString = ERROR_DURATION_NONNEGATIVE;
+                        errorStrLen = sizeof(ERROR_DURATION_NONNEGATIVE)-1;
+                    }
                     break;
             }
             break;

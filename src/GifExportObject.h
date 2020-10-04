@@ -7,11 +7,11 @@
 class GifExportObject : public LogicalObject {
 
 public:
-    GifExportObject(int sourceId, const std::string &filename, int framerateExpr, int durationExpr, int repeatExpr, float framerate, float duration, bool repeat);
+    GifExportObject(int sourceId, bool animated, const std::string &filename, int framerateExpr, int durationExpr, int repeatExpr, float framerate, float duration, bool repeat);
     GifExportObject(const GifExportObject &) = delete;
     virtual ~GifExportObject();
     GifExportObject & operator=(const GifExportObject &) = delete;
-    GifExportObject * reconfigure(int sourceId, const std::string &filename, int framerateExpr, int durationExpr, int repeatExpr, float framerate, float duration, bool repeat);
+    GifExportObject * reconfigure(int sourceId, bool animated, const std::string &filename, int framerateExpr, int durationExpr, int repeatExpr, float framerate, float duration, bool repeat);
     virtual int setExpressionValue(int exprId, int type, const void *value) override;
     virtual int offerSource(void *&pixelBuffer, int sourceId, int width, int height) override;
     virtual void setSourcePixels(int sourceId, const void *pixels, int width, int height) override;

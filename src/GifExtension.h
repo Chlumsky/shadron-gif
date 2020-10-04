@@ -18,7 +18,7 @@
 #define INITIALIZER_QUANTIZE_ID 2
 #define INITIALIZER_QUANTIZE_NAME "quantize"
 
-#define ERROR_EXPORT_SOURCE_TYPE "Only animation objects may be exported as GIF files"
+#define ERROR_EXPORT_SOURCE_TYPE "Only animation and image objects may be exported as GIF files"
 #define ERROR_FRAMERATE_POSITIVE "The animation frame rate must be a positive floating point value"
 #define ERROR_DURATION_NONNEGATIVE "The animation duration must be a positive time in seconds"
 #define ERROR_QUANTIZE_RANGE "The number of colors must be between 2 and 256"

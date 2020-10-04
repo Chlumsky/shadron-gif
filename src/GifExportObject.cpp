@@ -17,8 +17,11 @@ struct GifExportObject::GifExportData {
     int frameDelay;
 };
 
-GifExportObject::GifExportObject(int sourceId, const std::string &filename, int framerateExpr, int durationExpr, int repeatExpr, float framerate, float duration, bool repeat) : LogicalObject(std::string()), data(new GifExportData), sourceId(sourceId), filename(filename), framerateExpr(framerateExpr), durationExpr(durationExpr), repeatExpr(repeatExpr), framerate(framerate), duration(duration), repeat(repeat) {
-    frameCount = (int) ceilf(framerate*duration);
+GifExportObject::GifExportObject(int sourceId, bool animated, const std::string &filename, int framerateExpr, int durationExpr, int repeatExpr, float framerate, float duration, bool repeat) : LogicalObject(std::string()), data(new GifExportData), sourceId(sourceId), filename(filename), framerateExpr(framerateExpr), durationExpr(durationExpr), repeatExpr(repeatExpr), framerate(framerate), duration(duration), repeat(repeat) {
+    if (animated)
+        frameCount = (int) ceilf(framerate*duration);
+    else
+        frameCount = 1;
     if (framerate > 0.f) {
         frameDuration = 1.f/framerate;
         data->frameDelay = (int) roundf(100.f/framerate);
@@ -40,7 +43,7 @@ GifExportObject::~GifExportObject() {
     delete data;
 }
 
-GifExportObject * GifExportObject::reconfigure(int sourceId, const std::string &filename, int framerateExpr, int durationExpr, int repeatExpr, float framerate, float duration, bool repeat) {
+GifExportObject * GifExportObject::reconfigure(int sourceId, bool animated, const std::string &filename, int framerateExpr, int durationExpr, int repeatExpr, float framerate, float duration, bool repeat) {
     return NULL;
 }
 
@@ -119,7 +122,7 @@ std::string GifExportObject::getExportFilename() const {
 }
 
 bool GifExportObject::prepareExportStep(int step, float &time, float &deltaTime) {
-    time = step/framerate;
+    time = framerate > 0.f ? step/framerate : 0.f;
     deltaTime = frameDuration;
     this->step = step;
     return true;
