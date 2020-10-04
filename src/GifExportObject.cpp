@@ -5,6 +5,7 @@
 #include <cstring>
 #include <cstdint>
 #include <gif_lib.h>
+#include "open-utf8.h"
 #include "quantize.h"
 
 struct GifExportObject::GifExportData {
@@ -114,7 +115,8 @@ bool GifExportObject::exportStep(int step) {
         }
         ColorMapObject *colorMap = GifMakeMapObject(data->paletteSize, colors);
         if (step == 0) {
-            if ((data->gif = EGifOpenFileName(filename.c_str(), false, NULL))) {
+            int fd = openUtf8(filename.c_str(), O_WRONLY|O_CREAT|O_TRUNC, S_IREAD|S_IWRITE);
+            if (fd != -1 && (data->gif = EGifOpenFileHandle(fd, NULL))) {
                 data->gif->SWidth = data->w;
                 data->gif->SHeight = data->h;
                 data->gif->SColorResolution = 8;

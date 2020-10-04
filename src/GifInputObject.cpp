@@ -2,6 +2,7 @@
 #include "GifInputObject.h"
 
 #include <gif_lib.h>
+#include "open-utf8.h"
 
 struct GifInputData {
     GifFileType *gif;
@@ -68,21 +69,24 @@ bool GifInputObject::loadFile(const char *filename) {
             return false;
         filename = initialFilename.c_str();
     }
-    GifFileType *gif = DGifOpenFileName(filename, NULL);
-    if (gif) {
-        if (DGifSlurp(gif) == GIF_OK) {
-            unloadFile();
-            data->gif = gif;
-            data->fw = gif->SWidth;
-            data->fh = gif->SHeight;
-            data->frame = new uint32_t[data->fw*data->fh];
-            data->curFrame = -1;
-            data->curFrameDuration = 0;
-            data->curFrameEndTime = 0;
-            frameRemainingTime = 0;
-            return true;
+    int fd = openUtf8(filename, O_RDONLY);
+    if (fd != -1) {
+        GifFileType *gif = DGifOpenFileHandle(fd, NULL);
+        if (gif) {
+            if (DGifSlurp(gif) == GIF_OK) {
+                unloadFile();
+                data->gif = gif;
+                data->fw = gif->SWidth;
+                data->fh = gif->SHeight;
+                data->frame = new uint32_t[data->fw*data->fh];
+                data->curFrame = -1;
+                data->curFrameDuration = 0;
+                data->curFrameEndTime = 0;
+                frameRemainingTime = 0;
+                return true;
+            }
+            DGifCloseFile(gif, NULL);
         }
-        DGifCloseFile(gif, NULL);
     }
     return false;
 }

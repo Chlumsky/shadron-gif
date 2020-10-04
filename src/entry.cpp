@@ -235,12 +235,14 @@ int __declspec(dllexport) shadron_parse_error_length(void *context, void *parseC
                     *length = sizeof(ERROR_DURATION_NONNEGATIVE)-1;
                     return SHADRON_RESULT_OK;
             }
+            break;
         case INITIALIZER_QUANTIZE_ID:
             switch (pd->curArg) {
                 case 1: // Color count
                     *length = sizeof(ERROR_QUANTIZE_RANGE)-1;
                     return SHADRON_RESULT_OK;
             }
+            break;
         default:
             return SHADRON_RESULT_NO_DATA;
     }
@@ -266,6 +268,7 @@ int __declspec(dllexport) shadron_parse_error_string(void *context, void *parseC
                     errorStrLen = sizeof(ERROR_DURATION_NONNEGATIVE)-1;
                     break;
             }
+            break;
         case INITIALIZER_QUANTIZE_ID:
             switch (pd->curArg) {
                 case 1: // Color count
@@ -273,6 +276,7 @@ int __declspec(dllexport) shadron_parse_error_string(void *context, void *parseC
                     errorStrLen = sizeof(ERROR_QUANTIZE_RANGE)-1;
                     break;
             }
+            break;
         default:;
     }
     if (errorString) {
