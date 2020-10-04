@@ -18,6 +18,14 @@ QuantizeObject::~QuantizeObject() {
     free(bitmap);
 }
 
+QuantizeObject * QuantizeObject::reconfigure(int sourceId, int exprCountId) {
+    if (this) {
+        this->sourceId = sourceId;
+        this->exprCountId = exprCountId;
+    }
+    return this;
+}
+
 bool QuantizeObject::prepare(int &width, int &height, bool hardReset, bool repeat) {
     return getSize(width, height);
 }

@@ -7,7 +7,7 @@
 #include <gif_lib.h>
 #include "quantize.h"
 
-struct GifExportData {
+struct GifExportObject::GifExportData {
     GifFileType *gif;
     unsigned char *indexedBitmap;
     int w, h;
@@ -32,6 +32,20 @@ GifExportObject::~GifExportObject() {
     finishExport();
     free(data->indexedBitmap);
     delete data;
+}
+
+GifExportObject * GifExportObject::reconfigure(int sourceId, const std::string &filename, float framerate, float duration, bool repeat) {
+    if (this) {
+        this->sourceId = sourceId;
+        this->filename = filename;
+        this->framerate = framerate;
+        this->duration = duration;
+        this->repeat = repeat;
+        frameCount = (int) ceilf(framerate*duration);
+        frameDuration = 1.f/framerate;
+        data->frameDelay = (int) roundf(100.f/framerate);
+    }
+    return this;
 }
 
 int GifExportObject::offerSource(void *&pixelBuffer, int sourceId, int width, int height) {

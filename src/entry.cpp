@@ -186,13 +186,13 @@ int __declspec(dllexport) shadron_parse_initializer_finish(void *context, void *
         if (obj) {
             switch (pd->initializer) {
                 case INITIALIZER_GIF_FILE_ID:
-                    obj = dynamic_cast<GifInputObject *>(obj);
+                    obj = dynamic_cast<GifInputObject *>(obj)->reconfigure(pd->filename);
                     break;
                 case INITIALIZER_GIF_EXPORT_ID:
-                    obj = dynamic_cast<GifExportObject *>(obj);
+                    obj = dynamic_cast<GifExportObject *>(obj)->reconfigure(pd->sourceId, pd->filename, pd->framerate, pd->duration, pd->repeat);
                     break;
                 case INITIALIZER_QUANTIZE_ID:
-                    obj = dynamic_cast<QuantizeObject *>(obj);
+                    obj = dynamic_cast<QuantizeObject *>(obj)->reconfigure(pd->sourceId, pd->exprColorCount);
                     break;
                 default:
                     obj = NULL;

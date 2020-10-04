@@ -10,14 +10,15 @@ public:
     QuantizeObject(const QuantizeObject &) = delete;
     virtual ~QuantizeObject();
     QuantizeObject & operator=(const QuantizeObject &) = delete;
-    virtual bool prepare(int &width, int &height, bool hardReset, bool repeat);
-    virtual bool getSize(int &width, int &height) const;
-    virtual bool acceptsFiles() const;
-    virtual int setExpressionValue(int exprId, int type, const void *value);
-    virtual int offerSource(void *&pixelBuffer, int sourceId, int width, int height);
-    virtual void setSourcePixels(int sourceId, const void *pixels, int width, int height);
-    virtual bool pixelsReady() const;
-    virtual const void * fetchPixels(float time, float deltaTime, bool realTime, int width, int height);
+    QuantizeObject * reconfigure(int sourceId, int exprCountId);
+    virtual bool prepare(int &width, int &height, bool hardReset, bool repeat) override;
+    virtual bool getSize(int &width, int &height) const override;
+    virtual bool acceptsFiles() const override;
+    virtual int setExpressionValue(int exprId, int type, const void *value) override;
+    virtual int offerSource(void *&pixelBuffer, int sourceId, int width, int height) override;
+    virtual void setSourcePixels(int sourceId, const void *pixels, int width, int height) override;
+    virtual bool pixelsReady() const override;
+    virtual const void * fetchPixels(float time, float deltaTime, bool realTime, int width, int height) override;
 
 private:
     int sourceId;

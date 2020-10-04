@@ -30,6 +30,12 @@ GifInputObject::~GifInputObject() {
     delete data;
 }
 
+GifInputObject * GifInputObject::reconfigure(const std::string &filename) {
+    if (this)
+        initialFilename = filename;
+    return this;
+}
+
 bool GifInputObject::prepare(int &width, int &height, bool hardReset, bool repeat) {
     this->repeat = repeat;
     if (!prepared || hardReset) {
