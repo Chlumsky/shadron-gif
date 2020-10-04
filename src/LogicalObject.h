@@ -5,6 +5,8 @@
 
 #define OBJ_RESIZE 2
 #define TYPE_INT 1
+#define TYPE_FLOAT 2
+#define TYPE_BOOL 3
 
 class LogicalObject {
 

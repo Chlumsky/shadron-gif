@@ -9,20 +9,26 @@
 #include "GifExportObject.h"
 #include "QuantizeObject.h"
 
+int SHADRON_VERSION;
+
 struct ParseData {
     int initializer;
     int curArg;
     std::string filename;
     int sourceId;
+    int exprFramerate;
+    int exprDuration;
+    int exprRepeat;
+    int exprColorCount;
     float framerate;
     float duration;
-    int exprColorCount;
     bool repeat;
 };
 
 extern "C" {
 
 int __declspec(dllexport) shadron_register_extension(int *magicNumber, int *flags, char *name, int *nameLength, int *version, void **context) {
+    SHADRON_VERSION = *version;
     *magicNumber = SHADRON_MAGICNO;
     *flags = SHADRON_FLAG_IMAGE|SHADRON_FLAG_ANIMATION|SHADRON_FLAG_EXPORT|SHADRON_FLAG_CHARSET_UTF8;
     if (*nameLength <= sizeof(EXTENSION_NAME))
@@ -109,6 +115,7 @@ int __declspec(dllexport) shadron_parse_initializer_argument(void *context, void
             }
             break;
         case INITIALIZER_GIF_EXPORT_ID:
+            // NOTE: In Shadron 1.4.0 and before, expression values are set after shadron_object_start_export which is too late, so they are only enabled for subsequent versions
             switch (pd->curArg) {
                 case 0: // Source animation name
                     if (argumentType != SHADRON_ARG_SOURCE_OBJ)
@@ -122,29 +129,41 @@ int __declspec(dllexport) shadron_parse_initializer_argument(void *context, void
                     if (argumentType != SHADRON_ARG_FILENAME)
                         return SHADRON_RESULT_UNEXPECTED_ERROR;
                     pd->filename = reinterpret_cast<const char *>(argumentData);
-                    *nextArgumentTypes = SHADRON_ARG_FLOAT;
+                    *nextArgumentTypes = SHADRON_ARG_FLOAT|(SHADRON_VERSION >= 141 ? SHADRON_ARG_EXPR_FLOAT : 0);
                     break;
                 case 2: // Animation framerate
-                    if (argumentType != SHADRON_ARG_FLOAT)
+                    if (argumentType == SHADRON_ARG_EXPR_FLOAT)
+                        pd->exprFramerate = *reinterpret_cast<const int *>(argumentData);
+                    else if (argumentType == SHADRON_ARG_FLOAT) {
+                        pd->exprFramerate = -1;
+                        pd->framerate = *reinterpret_cast<const float *>(argumentData);
+                        if (pd->framerate <= 0.f)
+                            return SHADRON_RESULT_PARSE_ERROR;
+                    } else
                         return SHADRON_RESULT_UNEXPECTED_ERROR;
-                    pd->framerate = *reinterpret_cast<const float *>(argumentData);
-                    if (pd->framerate <= 0.f)
-                        return SHADRON_RESULT_PARSE_ERROR;
-                    *nextArgumentTypes = SHADRON_ARG_FLOAT;
+                    *nextArgumentTypes = SHADRON_ARG_FLOAT|(SHADRON_VERSION >= 141 ? SHADRON_ARG_EXPR_FLOAT : 0);
                     break;
                 case 3: // Animation duration
-                    if (argumentType != SHADRON_ARG_FLOAT)
+                    if (argumentType == SHADRON_ARG_EXPR_FLOAT)
+                        pd->exprDuration = *reinterpret_cast<const int *>(argumentData);
+                    else if (argumentType == SHADRON_ARG_FLOAT) {
+                        pd->exprDuration = -1;
+                        pd->duration = *reinterpret_cast<const float *>(argumentData);
+                        if (pd->duration <= 0.f)
+                            return SHADRON_RESULT_PARSE_ERROR;
+                    } else
                         return SHADRON_RESULT_UNEXPECTED_ERROR;
-                    pd->duration = *reinterpret_cast<const float *>(argumentData);
-                    if (pd->duration <= 0.f)
-                        return SHADRON_RESULT_PARSE_ERROR;
+                    pd->exprRepeat = -1;
                     pd->repeat = true;
-                    *nextArgumentTypes = SHADRON_ARG_NONE|SHADRON_ARG_BOOL;
+                    *nextArgumentTypes = SHADRON_ARG_NONE|SHADRON_ARG_BOOL|(SHADRON_VERSION >= 141 ? SHADRON_ARG_EXPR_BOOL : 0);
                     break;
                 case 4: // Repeat (true / false)
-                    if (argumentType != SHADRON_ARG_BOOL)
+                    if (argumentType == SHADRON_ARG_EXPR_BOOL)
+                        pd->exprRepeat = *reinterpret_cast<const int *>(argumentData);
+                    else if (argumentType == SHADRON_ARG_BOOL)
+                        pd->repeat = *reinterpret_cast<const int *>(argumentData) != 0;
+                    else
                         return SHADRON_RESULT_UNEXPECTED_ERROR;
-                    pd->repeat = *reinterpret_cast<const int *>(argumentData) != 0;
                     *nextArgumentTypes = SHADRON_ARG_NONE;
                     break;
                 default:
@@ -189,7 +208,7 @@ int __declspec(dllexport) shadron_parse_initializer_finish(void *context, void *
                     obj = dynamic_cast<GifInputObject *>(obj)->reconfigure(pd->filename);
                     break;
                 case INITIALIZER_GIF_EXPORT_ID:
-                    obj = dynamic_cast<GifExportObject *>(obj)->reconfigure(pd->sourceId, pd->filename, pd->framerate, pd->duration, pd->repeat);
+                    obj = dynamic_cast<GifExportObject *>(obj)->reconfigure(pd->sourceId, pd->filename, pd->exprFramerate, pd->exprDuration, pd->exprRepeat, pd->framerate, pd->duration, pd->repeat);
                     break;
                 case INITIALIZER_QUANTIZE_ID:
                     obj = dynamic_cast<QuantizeObject *>(obj)->reconfigure(pd->sourceId, pd->exprColorCount);
@@ -204,7 +223,7 @@ int __declspec(dllexport) shadron_parse_initializer_finish(void *context, void *
                     obj = new GifInputObject(name, pd->filename);
                     break;
                 case INITIALIZER_GIF_EXPORT_ID:
-                    obj = new GifExportObject(pd->sourceId, pd->filename, pd->framerate, pd->duration, pd->repeat);
+                    obj = new GifExportObject(pd->sourceId, pd->filename, pd->exprFramerate, pd->exprDuration, pd->exprRepeat, pd->framerate, pd->duration, pd->repeat);
                     break;
                 case INITIALIZER_QUANTIZE_ID:
                     obj = new QuantizeObject(name, pd->sourceId, pd->exprColorCount);
@@ -243,9 +262,9 @@ int __declspec(dllexport) shadron_parse_error_length(void *context, void *parseC
                     return SHADRON_RESULT_OK;
             }
             break;
-        default:
-            return SHADRON_RESULT_NO_DATA;
+        default:;
     }
+    return SHADRON_RESULT_NO_DATA;
 }
 
 int __declspec(dllexport) shadron_parse_error_string(void *context, void *parseContext, void *buffer, int *length, int bufferEncoding) {
@@ -324,8 +343,17 @@ int __declspec(dllexport) shadron_object_unload_file(void *context, void *object
 int __declspec(dllexport) shadron_object_set_expression_value(void *context, void *object, int exprIndex, int valueType, const void *value) {
     LogicalObject *obj = reinterpret_cast<LogicalObject *>(object);
     int type = -1;
-    if (valueType == SHADRON_ARG_INT)
-        type = TYPE_INT;
+    switch (valueType) {
+        case SHADRON_ARG_INT:
+            type = TYPE_INT;
+            break;
+        case SHADRON_ARG_FLOAT:
+            type = TYPE_FLOAT;
+            break;
+        case SHADRON_ARG_BOOL:
+            type = TYPE_BOOL;
+            break;
+    }
     int result = obj->setExpressionValue(exprIndex, type, value);
     if (result) {
         if (result == OBJ_RESIZE)

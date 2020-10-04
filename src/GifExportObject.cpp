@@ -17,16 +17,21 @@ struct GifExportObject::GifExportData {
     int frameDelay;
 };
 
-GifExportObject::GifExportObject(int sourceId, const std::string &filename, float framerate, float duration, bool repeat) : LogicalObject(std::string()), data(new GifExportData), sourceId(sourceId), filename(filename), framerate(framerate), duration(duration), repeat(repeat) {
+GifExportObject::GifExportObject(int sourceId, const std::string &filename, int framerateExpr, int durationExpr, int repeatExpr, float framerate, float duration, bool repeat) : LogicalObject(std::string()), data(new GifExportData), sourceId(sourceId), filename(filename), framerateExpr(framerateExpr), durationExpr(durationExpr), repeatExpr(repeatExpr), framerate(framerate), duration(duration), repeat(repeat) {
     frameCount = (int) ceilf(framerate*duration);
-    frameDuration = 1.f/framerate;
+    if (framerate > 0.f) {
+        frameDuration = 1.f/framerate;
+        data->frameDelay = (int) roundf(100.f/framerate);
+    } else {
+        frameDuration = 0.f;
+        data->frameDelay = 0;
+    }
     step = -1;
     data->gif = NULL;
     data->indexedBitmap = NULL;
     data->w = 0, data->h = 0;
     memset(data->palette, 0, sizeof(data->palette));
     data->paletteSize = 0;
-    data->frameDelay = (int) roundf(100.f/framerate);
 }
 
 GifExportObject::~GifExportObject() {
@@ -35,18 +40,38 @@ GifExportObject::~GifExportObject() {
     delete data;
 }
 
-GifExportObject * GifExportObject::reconfigure(int sourceId, const std::string &filename, float framerate, float duration, bool repeat) {
-    if (this) {
-        this->sourceId = sourceId;
-        this->filename = filename;
-        this->framerate = framerate;
-        this->duration = duration;
-        this->repeat = repeat;
+GifExportObject * GifExportObject::reconfigure(int sourceId, const std::string &filename, int framerateExpr, int durationExpr, int repeatExpr, float framerate, float duration, bool repeat) {
+    return NULL;
+}
+
+int GifExportObject::setExpressionValue(int exprId, int type, const void *value) {
+    int result = 0;
+    if (exprId == framerateExpr && type == TYPE_FLOAT) {
+        framerate = *reinterpret_cast<const float *>(value);
+        if (framerate < 0.f)
+            framerate = 0.f;
         frameCount = (int) ceilf(framerate*duration);
-        frameDuration = 1.f/framerate;
-        data->frameDelay = (int) roundf(100.f/framerate);
+        if (framerate > 0.f) {
+            frameDuration = 1.f/framerate;
+            data->frameDelay = (int) roundf(100.f/framerate);
+        } else {
+            frameDuration = 0.f;
+            data->frameDelay = 0;
+        }
+        result = 1;
     }
-    return this;
+    if (exprId == durationExpr && type == TYPE_FLOAT) {
+        duration = *reinterpret_cast<const float *>(value);
+        if (duration < 0.f)
+            duration = 0.f;
+        frameCount = (int) ceilf(framerate*duration);
+        result = 1;
+    }
+    if (exprId == repeatExpr && type == TYPE_BOOL) {
+        repeat = *reinterpret_cast<const int *>(value) != 0;
+        result = 1;
+    }
+    return result;
 }
 
 int GifExportObject::offerSource(void *&pixelBuffer, int sourceId, int width, int height) {
@@ -72,6 +97,8 @@ void GifExportObject::setSourcePixels(int sourceId, const void *pixels, int widt
 }
 
 bool GifExportObject::startExport() {
+    if (frameCount <= 0)
+        return false;
     step = -1;
     return true;
 }
@@ -124,9 +151,11 @@ bool GifExportObject::exportStep(int step) {
                 data->gif->AspectByte = 0;
                 data->gif->SColorMap = colorMap;
                 colorMap = NULL;
-                unsigned char repeatExtensions[] = { 0x4e, 0x45, 0x54, 0x53, 0x43, 0x41, 0x50, 0x45, 0x32, 0x2e, 0x30, 0x01, !repeat, 0x00 };
-                GifAddExtensionBlock(&data->gif->ExtensionBlockCount, &data->gif->ExtensionBlocks, 0xff, 11, repeatExtensions);
-                GifAddExtensionBlock(&data->gif->ExtensionBlockCount, &data->gif->ExtensionBlocks, 0x00, 3, repeatExtensions+11);
+                if (repeat) {
+                    unsigned char repeatExtensions[] = { 0x4e, 0x45, 0x54, 0x53, 0x43, 0x41, 0x50, 0x45, 0x32, 0x2e, 0x30, 0x01, 0x00, 0x00 };
+                    GifAddExtensionBlock(&data->gif->ExtensionBlockCount, &data->gif->ExtensionBlocks, 0xff, 11, repeatExtensions);
+                    GifAddExtensionBlock(&data->gif->ExtensionBlockCount, &data->gif->ExtensionBlocks, 0x00, 3, repeatExtensions+11);
+                }
             }
         }
         if (data->gif) {
