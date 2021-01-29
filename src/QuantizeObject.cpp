@@ -19,10 +19,8 @@ QuantizeObject::~QuantizeObject() {
 }
 
 QuantizeObject * QuantizeObject::reconfigure(int sourceId, int exprCountId) {
-    if (this) {
-        this->sourceId = sourceId;
-        this->exprCountId = exprCountId;
-    }
+    this->sourceId = sourceId;
+    this->exprCountId = exprCountId;
     return this;
 }
 

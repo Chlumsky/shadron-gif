@@ -4,6 +4,8 @@
 #include <string>
 #include "LogicalObject.h"
 
+struct GifInputData;
+
 class GifInputObject : public LogicalObject {
     friend struct GifInputData;
 

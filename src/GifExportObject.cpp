@@ -2,6 +2,7 @@
 #include "GifExportObject.h"
 
 #include <cstdlib>
+#include <cmath>
 #include <cstring>
 #include <cstdint>
 #include <gif_lib.h>

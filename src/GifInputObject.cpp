@@ -32,8 +32,7 @@ GifInputObject::~GifInputObject() {
 }
 
 GifInputObject * GifInputObject::reconfigure(const std::string &filename) {
-    if (this)
-        initialFilename = filename;
+    initialFilename = filename;
     return this;
 }
 

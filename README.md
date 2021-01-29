@@ -12,10 +12,17 @@ which adds the functionality to load and export animated GIF files via
 
 ## Installation
 
-Place `shadron-gif.dll`
-in the `extensions` directory next to Shadron's executable, or better yet,
+### Windows
+
+Place `shadron-gif.dll` in the `extensions` directory next to Shadron's executable, or better yet,
 in `%APPDATA%\Shadron\extensions`. It will be automatically detected by Shadron on next launch.
 Requires Shadron 1.1.3 or later.
+
+### Mac
+
+Place `shadron-gif.dylib` in `~/.config/Shadron/extensions`.
+It will be automatically detected by Shadron on next launch.
+Requires Shadron 1.4.2 or later.
 
 ## Usage
 

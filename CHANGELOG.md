@@ -1,6 +1,10 @@
 
 # Changelog
 
+## Version 1.3 (2021-01-29)
+
+- Added Mac OS version
+
 ## Version 1.2 (2020-10-04)
 
 - Added support for Unicode characters in filenames

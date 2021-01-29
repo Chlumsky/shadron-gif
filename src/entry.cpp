@@ -26,9 +26,15 @@ struct ParseData {
     bool repeat;
 };
 
+template <class T, typename... A>
+static void reconfigure(LogicalObject *&obj, A... args) {
+    T *subObj = dynamic_cast<T *>(obj);
+    obj = subObj ? subObj->reconfigure(args...) : NULL;
+}
+
 extern "C" {
 
-int __declspec(dllexport) shadron_register_extension(int *magicNumber, int *flags, char *name, int *nameLength, int *version, void **context) {
+int SHADRON_API_FN shadron_register_extension(int *magicNumber, int *flags, char *name, int *nameLength, int *version, void **context) {
     SHADRON_VERSION = *version;
     *magicNumber = SHADRON_MAGICNO;
     *flags = SHADRON_FLAG_IMAGE|SHADRON_FLAG_ANIMATION|SHADRON_FLAG_EXPORT|SHADRON_FLAG_CHARSET_UTF8;
@@ -41,13 +47,13 @@ int __declspec(dllexport) shadron_register_extension(int *magicNumber, int *flag
     return SHADRON_RESULT_OK;
 }
 
-int __declspec(dllexport) shadron_unregister_extension(void *context) {
+int SHADRON_API_FN shadron_unregister_extension(void *context) {
     GifExtension *ext = reinterpret_cast<GifExtension *>(context);
     delete ext;
     return SHADRON_RESULT_OK;
 }
 
-int __declspec(dllexport) shadron_register_initializer(void *context, int index, int *flags, char *name, int *nameLength) {
+int SHADRON_API_FN shadron_register_initializer(void *context, int index, int *flags, char *name, int *nameLength) {
     switch (index) {
         case INITIALIZER_GIF_FILE_ID:
             if (*nameLength <= sizeof(INITIALIZER_GIF_FILE_NAME))
@@ -75,7 +81,7 @@ int __declspec(dllexport) shadron_register_initializer(void *context, int index,
     }
 }
 
-int __declspec(dllexport) shadron_parse_initializer(void *context, int objectType, int index, const char *name, int nameLength, void **parseContext, int *firstArgumentTypes) {
+int SHADRON_API_FN shadron_parse_initializer(void *context, int objectType, int index, const char *name, int nameLength, void **parseContext, int *firstArgumentTypes) {
     switch (index) {
         case INITIALIZER_GIF_FILE_ID:
             if (objectType != SHADRON_FLAG_ANIMATION)
@@ -100,7 +106,7 @@ int __declspec(dllexport) shadron_parse_initializer(void *context, int objectTyp
     }
 }
 
-int __declspec(dllexport) shadron_parse_initializer_argument(void *context, void *parseContext, int argNo, int argumentType, const void *argumentData, int *nextArgumentTypes) {
+int SHADRON_API_FN shadron_parse_initializer_argument(void *context, void *parseContext, int argNo, int argumentType, const void *argumentData, int *nextArgumentTypes) {
     ParseData *pd = reinterpret_cast<ParseData *>(parseContext);
     switch (pd->initializer) {
         case INITIALIZER_GIF_FILE_ID:
@@ -200,7 +206,7 @@ int __declspec(dllexport) shadron_parse_initializer_argument(void *context, void
     return SHADRON_RESULT_OK;
 }
 
-int __declspec(dllexport) shadron_parse_initializer_finish(void *context, void *parseContext, int result, int objectType, const char *objectName, int nameLength, void **object) {
+int SHADRON_API_FN shadron_parse_initializer_finish(void *context, void *parseContext, int result, int objectType, const char *objectName, int nameLength, void **object) {
     GifExtension *ext = reinterpret_cast<GifExtension *>(context);
     ParseData *pd = reinterpret_cast<ParseData *>(parseContext);
     int newResult = SHADRON_RESULT_OK;
@@ -210,13 +216,13 @@ int __declspec(dllexport) shadron_parse_initializer_finish(void *context, void *
         if (obj) {
             switch (pd->initializer) {
                 case INITIALIZER_GIF_FILE_ID:
-                    obj = dynamic_cast<GifInputObject *>(obj)->reconfigure(pd->filename);
+                    reconfigure<GifInputObject>(obj, pd->filename);
                     break;
                 case INITIALIZER_GIF_EXPORT_ID:
-                    obj = dynamic_cast<GifExportObject *>(obj)->reconfigure(pd->sourceId, pd->animated, pd->filename, pd->exprFramerate, pd->exprDuration, pd->exprRepeat, pd->framerate, pd->duration, pd->repeat);
+                    reconfigure<GifExportObject>(obj, pd->sourceId, pd->animated, pd->filename, pd->exprFramerate, pd->exprDuration, pd->exprRepeat, pd->framerate, pd->duration, pd->repeat);
                     break;
                 case INITIALIZER_QUANTIZE_ID:
-                    obj = dynamic_cast<QuantizeObject *>(obj)->reconfigure(pd->sourceId, pd->exprColorCount);
+                    reconfigure<QuantizeObject>(obj, pd->sourceId, pd->exprColorCount);
                     break;
                 default:
                     obj = NULL;
@@ -244,7 +250,7 @@ int __declspec(dllexport) shadron_parse_initializer_finish(void *context, void *
     return newResult;
 }
 
-int __declspec(dllexport) shadron_parse_error_length(void *context, void *parseContext, int *length, int encoding) {
+int SHADRON_API_FN shadron_parse_error_length(void *context, void *parseContext, int *length, int encoding) {
     ParseData *pd = reinterpret_cast<ParseData *>(parseContext);
     switch (pd->initializer) {
         case INITIALIZER_GIF_EXPORT_ID:
@@ -278,7 +284,7 @@ int __declspec(dllexport) shadron_parse_error_length(void *context, void *parseC
     return SHADRON_RESULT_NO_DATA;
 }
 
-int __declspec(dllexport) shadron_parse_error_string(void *context, void *parseContext, void *buffer, int *length, int bufferEncoding) {
+int SHADRON_API_FN shadron_parse_error_string(void *context, void *parseContext, void *buffer, int *length, int bufferEncoding) {
     ParseData *pd = reinterpret_cast<ParseData *>(parseContext);
     const char *errorString = NULL;
     int errorStrLen = 0;
@@ -323,7 +329,7 @@ int __declspec(dllexport) shadron_parse_error_string(void *context, void *parseC
     return SHADRON_RESULT_NO_DATA;
 }
 
-int __declspec(dllexport) shadron_object_prepare(void *context, void *object, int *flags, int *width, int *height, int *format) {
+int SHADRON_API_FN shadron_object_prepare(void *context, void *object, int *flags, int *width, int *height, int *format) {
     LogicalObject *obj = reinterpret_cast<LogicalObject *>(object);
     if (!obj->prepare(*width, *height, (*flags&SHADRON_FLAG_HARD_RESET) != 0, (*flags&SHADRON_FLAG_REPEAT) != 0))
         return SHADRON_RESULT_UNEXPECTED_ERROR;
@@ -334,7 +340,7 @@ int __declspec(dllexport) shadron_object_prepare(void *context, void *object, in
     return SHADRON_RESULT_OK;
 }
 
-int __declspec(dllexport) shadron_object_size(void *context, void *object, int *width, int *height, int *format) {
+int SHADRON_API_FN shadron_object_size(void *context, void *object, int *width, int *height, int *format) {
     LogicalObject *obj = reinterpret_cast<LogicalObject *>(object);
     if (!obj->getSize(*width, *height))
         return SHADRON_RESULT_UNEXPECTED_ERROR;
@@ -342,20 +348,20 @@ int __declspec(dllexport) shadron_object_size(void *context, void *object, int *
     return SHADRON_RESULT_OK;
 }
 
-int __declspec(dllexport) shadron_object_load_file(void *context, void *object, const void *path, int pathLength, int pathEncoding) {
+int SHADRON_API_FN shadron_object_load_file(void *context, void *object, const void *path, int pathLength, int pathEncoding) {
     LogicalObject *obj = reinterpret_cast<LogicalObject *>(object);
     if (!obj->loadFile(reinterpret_cast<const char *>(path)))
         return SHADRON_RESULT_FILE_IO_ERROR;
     return SHADRON_RESULT_OK_RESIZE;
 }
 
-int __declspec(dllexport) shadron_object_unload_file(void *context, void *object) {
+int SHADRON_API_FN shadron_object_unload_file(void *context, void *object) {
     LogicalObject *obj = reinterpret_cast<LogicalObject *>(object);
     obj->unloadFile();
     return SHADRON_RESULT_OK;
 }
 
-int __declspec(dllexport) shadron_object_set_expression_value(void *context, void *object, int exprIndex, int valueType, const void *value) {
+int SHADRON_API_FN shadron_object_set_expression_value(void *context, void *object, int exprIndex, int valueType, const void *value) {
     LogicalObject *obj = reinterpret_cast<LogicalObject *>(object);
     int type = -1;
     switch (valueType) {
@@ -378,7 +384,7 @@ int __declspec(dllexport) shadron_object_set_expression_value(void *context, voi
     return SHADRON_RESULT_IGNORE;
 }
 
-int __declspec(dllexport) shadron_object_offer_source_pixels(void *context, void *object, int sourceIndex, int sourceType, int width, int height, int *format, void **pixelBuffer, void **pixelsContext) {
+int SHADRON_API_FN shadron_object_offer_source_pixels(void *context, void *object, int sourceIndex, int sourceType, int width, int height, int *format, void **pixelBuffer, void **pixelsContext) {
     LogicalObject *obj = reinterpret_cast<LogicalObject *>(object);
     int result = obj->offerSource(*pixelBuffer, sourceIndex, width, height);
     if (result) {
@@ -390,7 +396,7 @@ int __declspec(dllexport) shadron_object_offer_source_pixels(void *context, void
     return SHADRON_RESULT_IGNORE;
 }
 
-int __declspec(dllexport) shadron_object_post_source_pixels(void *context, void *object, void *pixelsContext, int sourceIndex, int plane, int width, int height, int format, const void *pixels) {
+int SHADRON_API_FN shadron_object_post_source_pixels(void *context, void *object, void *pixelsContext, int sourceIndex, int plane, int width, int height, int format, const void *pixels) {
     LogicalObject *obj = reinterpret_cast<LogicalObject *>(object);
     if (format != SHADRON_FORMAT_RGBA_BYTE)
         return SHADRON_RESULT_UNEXPECTED_ERROR;
@@ -398,7 +404,7 @@ int __declspec(dllexport) shadron_object_post_source_pixels(void *context, void 
     return SHADRON_RESULT_OK;
 }
 
-int __declspec(dllexport) shadron_object_user_command(void *context, void *object, int command) {
+int SHADRON_API_FN shadron_object_user_command(void *context, void *object, int command) {
     LogicalObject *obj = reinterpret_cast<LogicalObject *>(object);
     switch (command) {
         case SHADRON_COMMAND_RESTART:
@@ -409,14 +415,14 @@ int __declspec(dllexport) shadron_object_user_command(void *context, void *objec
     }
 }
 
-int __declspec(dllexport) shadron_object_destroy(void *context, void *object) {
+int SHADRON_API_FN shadron_object_destroy(void *context, void *object) {
     GifExtension *ext = reinterpret_cast<GifExtension *>(context);
     LogicalObject *obj = reinterpret_cast<LogicalObject *>(object);
     ext->unrefObject(obj);
     return SHADRON_RESULT_OK;
 }
 
-int __declspec(dllexport) shadron_object_fetch_pixels(void *context, void *object, float time, float deltaTime, int realTime, int plane, int width, int height, int format, const void **pixels, void **pixelsContext) {
+int SHADRON_API_FN shadron_object_fetch_pixels(void *context, void *object, float time, float deltaTime, int realTime, int plane, int width, int height, int format, const void **pixels, void **pixelsContext) {
     LogicalObject *obj = reinterpret_cast<LogicalObject *>(object);
     if (!obj->pixelsReady())
         return SHADRON_RESULT_NO_DATA;
@@ -425,11 +431,11 @@ int __declspec(dllexport) shadron_object_fetch_pixels(void *context, void *objec
     return SHADRON_RESULT_OK;
 }
 
-int __declspec(dllexport) shadron_object_release_pixels(void *context, void *object, void *pixelsContext) {
+int SHADRON_API_FN shadron_object_release_pixels(void *context, void *object, void *pixelsContext) {
     return SHADRON_RESULT_OK;
 }
 
-int __declspec(dllexport) shadron_object_start_export(void *context, void *object, int *stepCount, void **exportData) {
+int SHADRON_API_FN shadron_object_start_export(void *context, void *object, int *stepCount, void **exportData) {
     LogicalObject *obj = reinterpret_cast<LogicalObject *>(object);
     if (!obj->startExport())
         return SHADRON_RESULT_NO_DATA;
@@ -437,7 +443,7 @@ int __declspec(dllexport) shadron_object_start_export(void *context, void *objec
     return SHADRON_RESULT_OK;
 }
 
-int __declspec(dllexport) shadron_export_prepare_step(void *context, void *object, void *exportData, int step, float *time, float *deltaTime, int *outputFilenameLength, int filenameEncoding) {
+int SHADRON_API_FN shadron_export_prepare_step(void *context, void *object, void *exportData, int step, float *time, float *deltaTime, int *outputFilenameLength, int filenameEncoding) {
     LogicalObject *obj = reinterpret_cast<LogicalObject *>(object);
     const std::string *outputFilename = NULL;
     if (!obj->prepareExportStep(step, *time, *deltaTime))
@@ -447,7 +453,7 @@ int __declspec(dllexport) shadron_export_prepare_step(void *context, void *objec
     return SHADRON_RESULT_OK;
 }
 
-int __declspec(dllexport) shadron_export_output_filename(void *context, void *object, void *exportData, int step, void *buffer, int *length, int encoding) {
+int SHADRON_API_FN shadron_export_output_filename(void *context, void *object, void *exportData, int step, void *buffer, int *length, int encoding) {
     LogicalObject *obj = reinterpret_cast<LogicalObject *>(object);
     std::string filename = obj->getExportFilename();
     if (encoding != SHADRON_FLAG_CHARSET_UTF8 || *length < (int) filename.size())
@@ -459,14 +465,14 @@ int __declspec(dllexport) shadron_export_output_filename(void *context, void *ob
     return SHADRON_RESULT_OK;
 }
 
-int __declspec(dllexport) shadron_export_step(void *context, void *object, void *exportData, int step, float time, float deltaTime) {
+int SHADRON_API_FN shadron_export_step(void *context, void *object, void *exportData, int step, float time, float deltaTime) {
     LogicalObject *obj = reinterpret_cast<LogicalObject *>(object);
     if (!obj->exportStep(step))
         return SHADRON_RESULT_FILE_IO_ERROR;
     return SHADRON_RESULT_OK;
 }
 
-int __declspec(dllexport) shadron_export_finish(void *context, void *object, void *exportData, int result) {
+int SHADRON_API_FN shadron_export_finish(void *context, void *object, void *exportData, int result) {
     LogicalObject *obj = reinterpret_cast<LogicalObject *>(object);
     obj->finishExport();
     return SHADRON_RESULT_OK;

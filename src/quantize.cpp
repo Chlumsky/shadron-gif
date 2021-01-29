@@ -62,12 +62,13 @@ void quantize(unsigned char *output, void *palette, const void *input, int width
     } else
         image = liq_image_create_rgba(attr, input, width, height, 0);
     liq_result *res = NULL;
-    liq_image_quantize(image, attr, &res);
-    liq_set_dithering_level(res, 1.f);
-    liq_write_remapped_image(res, image, output, width*height);
-    const liq_palette *pal = liq_get_palette(res);
-    colors = pal->count;
-    memcpy(palette, pal->entries, 4*colors);
+    if (liq_image_quantize(image, attr, &res) == LIQ_OK) {
+        liq_set_dithering_level(res, 1.f);
+        liq_write_remapped_image(res, image, output, width*height);
+        const liq_palette *pal = liq_get_palette(res);
+        colors = pal->count;
+        memcpy(palette, pal->entries, 4*colors);
+    }
     liq_result_destroy(res);
     liq_image_destroy(image);
     liq_attr_destroy(attr);
