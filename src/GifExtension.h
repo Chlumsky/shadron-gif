@@ -7,7 +7,7 @@
 #include "LogicalObject.h"
 
 #define EXTENSION_NAME "gif"
-#define EXTENSION_VERSION 130
+#define EXTENSION_VERSION 140
 
 #define INITIALIZER_GIF_FILE_ID 0
 #define INITIALIZER_GIF_FILE_NAME "gif_file"

@@ -1,28 +1,52 @@
 
 #include "GifInputObject.h"
 
+#include <cstdlib>
+#include <cstring>
+#include <cstdint>
+#include <algorithm>
 #include <gif_lib.h>
 #include "open-utf8.h"
+
+struct FrameBounds {
+    int x0, y0, x1, y1;
+};
 
 struct GifInputData {
     GifFileType *gif;
     uint32_t *frame;
+    uint32_t *prevFrame;
     int fw, fh;
     int curFrame;
     int curFrameDuration;
     int curFrameEndTime;
+    int curFrameDisposalMode;
+    FrameBounds curFrameBounds;
 };
+
+static void clearArea(uint32_t *frame, int fw, int fh, const FrameBounds &frameBounds) {
+    for (int y = frameBounds.y0; y < frameBounds.y1; ++y)
+        memset(frame+fw*(fh-y-1)+frameBounds.x0, 0, sizeof(uint32_t)*(frameBounds.x1-frameBounds.x0));
+}
+
+static void copyArea(uint32_t *dstFrame, const uint32_t *srcFrame, int fw, int fh, const FrameBounds &frameBounds) {
+    for (int y = frameBounds.y0; y < frameBounds.y1; ++y)
+        memcpy(dstFrame+fw*(fh-y-1)+frameBounds.x0, srcFrame+fw*(fh-y-1)+frameBounds.x0, sizeof(uint32_t)*(frameBounds.x1-frameBounds.x0));
+}
 
 GifInputObject::GifInputObject(const std::string &name, const std::string &filename) : LogicalObject(name), data(new GifInputData), initialFilename(filename) {
     prepared = false;
     repeat = false;
     data->gif = NULL;
     data->frame = NULL;
+    data->prevFrame = NULL;
     data->fw = 0;
     data->fh = 0;
     data->curFrame = -1;
     data->curFrameDuration = 0;
     data->curFrameEndTime = 0;
+    data->curFrameDisposalMode = DISPOSAL_UNSPECIFIED;
+    data->curFrameBounds = FrameBounds();
     frameRemainingTime = 0;
 }
 
@@ -78,10 +102,6 @@ bool GifInputObject::loadFile(const char *filename) {
                 data->fw = gif->SWidth;
                 data->fh = gif->SHeight;
                 data->frame = new uint32_t[data->fw*data->fh];
-                data->curFrame = -1;
-                data->curFrameDuration = 0;
-                data->curFrameEndTime = 0;
-                frameRemainingTime = 0;
                 return true;
             }
             DGifCloseFile(gif, NULL);
@@ -95,11 +115,17 @@ void GifInputObject::unloadFile() {
         delete [] data->frame;
         data->frame = NULL;
     }
+    if (data->prevFrame) {
+        delete [] data->prevFrame;
+        data->prevFrame = NULL;
+    }
     data->fw = 0;
     data->fh = 0;
     data->curFrame = -1;
     data->curFrameDuration = 0;
     data->curFrameEndTime = 0;
+    data->curFrameDisposalMode = DISPOSAL_UNSPECIFIED;
+    data->curFrameBounds = FrameBounds();
     frameRemainingTime = 0;
     if (data->gif) {
         DGifCloseFile(data->gif, NULL);
@@ -129,32 +155,58 @@ void GifInputObject::rewind() {
 bool GifInputObject::nextFrame() {
     int frameNo = data->curFrame = (data->curFrame+1)%data->gif->ImageCount;
     GraphicsControlBlock gcb;
-    gcb.DisposalMode = DISPOSE_BACKGROUND;
+    gcb.DisposalMode = DISPOSAL_UNSPECIFIED;
     gcb.UserInputFlag = 0;
     gcb.DelayTime = 4;
-    gcb.TransparentColor = -1;
+    gcb.TransparentColor = NO_TRANSPARENT_COLOR;
     DGifSavedExtensionToGCB(data->gif, frameNo, &gcb);
     data->curFrameDuration = gcb.DelayTime;
     data->curFrameEndTime += gcb.DelayTime;
-    bool keepFrame = gcb.DisposalMode == DISPOSE_DO_NOT && frameNo > 0;
     const ColorMapObject *colorMap = data->gif->SavedImages[frameNo].ImageDesc.ColorMap;
     if (!colorMap)
         colorMap = data->gif->SColorMap;
     const GifImageDesc &imageDesc = data->gif->SavedImages[frameNo].ImageDesc;
-    const GifByteType *src = data->gif->SavedImages[frameNo].RasterBits;
-    if (!colorMap || !src)
+    const GifByteType *raster = data->gif->SavedImages[frameNo].RasterBits;
+    if (!colorMap || (!raster && imageDesc.Width > 0 && imageDesc.Height > 0))
         return false;
-    if (!keepFrame && (imageDesc.Left > 0 || imageDesc.Width < data->fw || imageDesc.Top > 0 || imageDesc.Height < data->fh))
-        memset(data->frame, 0, sizeof(uint32_t)*data->fw*data->fh);
-    for (int y = imageDesc.Top; y < data->fh && y < imageDesc.Top+imageDesc.Height; ++y) {
-        uint32_t *dst = data->frame+data->fw*(data->fh-y-1)+imageDesc.Left;
-        for (int x = imageDesc.Left; x < data->fw && x < imageDesc.Left+imageDesc.Width; ++x) {
+    FrameBounds frameBounds = {
+        std::max(imageDesc.Left, 0),
+        std::max(imageDesc.Top, 0),
+        std::min(imageDesc.Left+imageDesc.Width, data->fw),
+        std::min(imageDesc.Top+imageDesc.Height, data->fh)
+    };
+    if (gcb.TransparentColor >= 0 || frameBounds.x0 > 0 || frameBounds.x1 < data->fw || frameBounds.y0 > 0 || frameBounds.y1 < data->fh || gcb.DisposalMode == DISPOSE_PREVIOUS) {
+        if (frameNo == 0)
+            memset(data->frame, 0, sizeof(uint32_t)*data->fw*data->fh);
+        else switch (data->curFrameDisposalMode) {
+            case DISPOSE_PREVIOUS:
+                if (data->prevFrame) {
+                    copyArea(data->frame, data->prevFrame, data->fw, data->fh, data->curFrameBounds);
+                    break;
+                }
+            case DISPOSE_BACKGROUND:
+                clearArea(data->frame, data->fw, data->fh, data->curFrameBounds);
+                break;
+        }
+    }
+    data->curFrameDisposalMode = gcb.DisposalMode;
+    data->curFrameBounds = frameBounds;
+    if (data->curFrameDisposalMode == DISPOSE_PREVIOUS) {
+        if (frameNo > 0) {
+            if (!data->prevFrame)
+                data->prevFrame = new uint32_t[data->fw*data->fh];
+            copyArea(data->prevFrame, data->frame, data->fw, data->fh, data->curFrameBounds);
+        } else
+            data->curFrameDisposalMode = DISPOSE_BACKGROUND;
+    }
+    for (int y = frameBounds.y0; y < frameBounds.y1; ++y) {
+        uint32_t *dst = data->frame+data->fw*(data->fh-y-1)+frameBounds.x0;
+        const GifByteType *src = raster+imageDesc.Width*(y-imageDesc.Top)+(frameBounds.x0-imageDesc.Left);
+        for (int x = frameBounds.x0; x < frameBounds.x1; ++x) {
             int index = int(*src++);
+            index *= (unsigned) index < (unsigned) colorMap->ColorCount;
             GifColorType c = colorMap->Colors[index];
-            if (index == gcb.TransparentColor) {
-                if (!keepFrame)
-                    *dst = uint32_t(c.Red)|uint32_t(c.Green)<<8|uint32_t(c.Blue)<<16;
-            } else
+            if (index != gcb.TransparentColor)
                 *dst = 0xff000000|uint32_t(c.Red)|uint32_t(c.Green)<<8|uint32_t(c.Blue)<<16;
             ++dst;
         }

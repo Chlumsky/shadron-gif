@@ -141,20 +141,18 @@ bool GifExportObject::exportStep(int step) {
             colors[i].Red = GifByteType(data->palette[i]&0xff);
             colors[i].Green = GifByteType(data->palette[i]>>8&0xff);
             colors[i].Blue = GifByteType(data->palette[i]>>16&0xff);
-            if (!(data->palette[i]&0xff000000))
+            if (gcb.TransparentColor == NO_TRANSPARENT_COLOR && !(data->palette[i]&0xff000000))
                 gcb.TransparentColor = i;
         }
-        ColorMapObject *colorMap = GifMakeMapObject(data->paletteSize, colors);
         if (step == 0) {
             int fd = openUtf8(filename.c_str(), O_WRONLY|O_CREAT|O_TRUNC, S_IREAD|S_IWRITE);
             if (fd != -1 && (data->gif = EGifOpenFileHandle(fd, NULL))) {
                 data->gif->SWidth = data->w;
                 data->gif->SHeight = data->h;
                 data->gif->SColorResolution = 8;
-                data->gif->SBackGroundColor = -1;
+                data->gif->SBackGroundColor = 0;
                 data->gif->AspectByte = 0;
-                data->gif->SColorMap = colorMap;
-                colorMap = NULL;
+                data->gif->SColorMap = NULL;
                 if (repeat) {
                     unsigned char repeatExtensions[] = { 0x4e, 0x45, 0x54, 0x53, 0x43, 0x41, 0x50, 0x45, 0x32, 0x2e, 0x30, 0x01, 0x00, 0x00 };
                     GifAddExtensionBlock(&data->gif->ExtensionBlockCount, &data->gif->ExtensionBlocks, 0xff, 11, repeatExtensions);
@@ -163,6 +161,7 @@ bool GifExportObject::exportStep(int step) {
             }
         }
         if (data->gif) {
+            ColorMapObject *colorMap = GifMakeMapObject(data->paletteSize, colors);
             SavedImage *image = GifMakeSavedImage(data->gif, NULL);
             if (image) {
                 image->ImageDesc.Left = 0;
@@ -175,13 +174,16 @@ bool GifExportObject::exportStep(int step) {
                 for (int y = 0; y < data->h; ++y)
                     memcpy(image->RasterBits+y*data->w, data->indexedBitmap+(data->h-y-1)*data->w, data->w);
                 EGifGCBToSavedExtension(&gcb, data->gif, step);
-                if (step == frameCount-1)
+                if (step == frameCount-1) {
                     if (EGifSpew(data->gif) == GIF_OK)
                         data->gif = NULL;
+                    else
+                        return false;
+                }
                 return true;
             }
+            GifFreeMapObject(colorMap);
         }
-        GifFreeMapObject(colorMap);
     }
     return false;
 }

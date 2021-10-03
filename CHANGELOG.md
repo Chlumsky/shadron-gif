@@ -1,6 +1,11 @@
 
 # Changelog
 
+## Version 1.4 (2021-10-03)
+
+- Fixed issues with transparency in exported GIF files
+- Improved compatibility with partial frames and disposal modes in input GIF files
+
 ## Version 1.3 (2021-01-29)
 
 - Added Mac OS version
